@@ -13,7 +13,7 @@ def leer_productos():
     try:
         with open(DATA_FILE, "r") as f:
             return json.load(f)
-    except FileNotFoundError:
+    except (FileNotFoundError, json.JSONDecodeError):
         return []
 
 def guardar_productos(productos):
@@ -46,14 +46,30 @@ class ProductoService(ServiceBase):
 # 📌 Configurar la aplicación SOAP
 soap_app = Application([ProductoService], 'mi.api.soap',
                        in_protocol=Soap11(), out_protocol=Soap11())
+
 wsgi_app = WsgiApplication(soap_app)
 
-@app.route("/soap", methods=["POST"])
+# 📌 Rutas SOAP en Flask
+@app.route("/soap", methods=["GET", "POST"])
 def soap_service():
-    return Response(wsgi_app(request.environ, request.start_response),
-                    content_type="text/xml; charset=utf-8")
+    if request.method == "GET":
+        return "Servicio SOAP activo. Accede a /soap?wsdl para ver el WSDL."
+    
+    return Response(
+        wsgi_app(request.environ, lambda status, headers: (status, headers)[1]),
+        content_type="text/xml; charset=utf-8"
+    )
 
-# 📌 Ejecutar la app
+# 📌 Agregar WSDL para visualizarlo en el navegador
+@app.route("/soap?wsdl", methods=["GET"])
+def soap_wsdl():
+    return Response(
+        soap_app.create_wsdl(),
+        content_type="text/xml; charset=utf-8"
+    )
+
+# 📌 Ejecutar la app en modo desarrollo (para pruebas locales)
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    app.run(debug=True)
+
 
